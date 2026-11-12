@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sam & Lewy">
+<meta name="theme-color" content="#ff4d00">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="logo.png">
+<title>Sam & Lewy</title>
+<style>
+body { font-family: -apple-system, sans-serif; background: #f4f7fb; margin: 0; padding: 20px; color: #1a1a1a; }
+h1 { text-align: center; color: #ff4d00; font-size: 32px; margin: 10px 0; }
+.btn { display: block; width: 100%; padding: 16px; background: #ff4d00; color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; margin: 10px 0; }
+.card { background: white; border-radius: 16px; padding: 16px; margin: 12px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+.tab { display: inline-block; padding: 10px 16px; margin: 4px; background: white; border-radius: 20px; border: 1px solid #ddd; }
+.tab.active { background: #ff4d00; color: white; }
+.section { display: none; }
+.section.active { display: block; }
+</style>
+</head>
+<body>
+<h1>Sam & Lewy</h1>
+<p style="text-align:center;color:#666;">NBA Fantasy</p>
+
+<div style="text-align:center;margin:16px 0;">
+  <span class="tab active" onclick="show('draft')">Draft</span>
+  <span class="tab" onclick="show('rosters')">Rosters</span>
+  <span class="tab" onclick="show('matchup')">Matchup</span>
+  <span class="tab" onclick="show('sync')">Sync</span>
+</div>
+
+<div id="draft" class="section active">
+  <div class="card">
+    <h3>Draft</h3>
+    <p>Tap a player to draft them.</p>
+    <div id="players"></div>
+  </div>
+</div>
+
+<div id="rosters" class="section">
+  <div class="card"><h3>Your Roster</h3><div id="youRoster">Empty</div></div>
+  <div class="card"><h3>Lewy's Roster</h3><div id="lewyRoster">Empty</div></div>
+</div>
+
+<div id="games" class="section">
+  <div class="card">
+    <h3>NBA Games</h3>
+    <button class="btn" onclick="loadGames()">Load Today’s Games</button>
+    <div id="gamesList" style="margin-top:12px;"></div>
+  </div>
+</div>
+  <div class="card">
+    <h3>Matchup</h3>
+    <p>You: <strong id="youScore">0</strong> &nbsp; Lewy: <strong id="lewyScore">0</strong></p>
+    <button class="btn" onclick="sim()">Simulate Scores</button>
+  </div>
+</div>
+
+<div id="sync" class="section">
+  <div class="card">
+    <h3>Sync</h3>
+    <button class="btn" onclick="exportCode()">Copy League Code</button>
+    <textarea id="importBox" placeholder="Paste code here" style="width:100%;height:80px;margin:10px 0;padding:10px;border-radius:8px;border:1px solid #ddd;"></textarea>
+    <button class="btn" onclick="importCode()" style="background:#333;">Import Code</button>
+  </div>
+</div>
+
+<script>
+const players = ["Jokić","Luka","SGA","Giannis","Embiid","AD","Tatum","Mitchell","Booker","Trae"];
+let state = { you: [], lewy: [], turn: 0, youScore: 0, lewyScore: 0 };
+
+function load() {
+  const s = localStorage.getItem("sl");
+  if (s) state = JSON.parse(s);
+  render();
+}
+function save() { localStorage.setItem("sl", JSON.stringify(state)); }
+
+function render() {
+  const box = document.getElementById("players");
+  box.innerHTML = "";
+  players.forEach((name, i) => {
+    if (state.you.includes(i) || state.lewy.includes(i)) return;
+    const b = document.createElement("button");
+    b.className = "btn";
+    b.textContent = name;
+    b.onclick = () => draft(i, name);
+    box.appendChild(b);
+  });
+  document.getElementById("youRoster").textContent = state.you.map(i => players[i]).join(", ") || "Empty";
+  document.getElementById("lewyRoster").textContent = state.lewy.map(i => players[i]).join(", ") || "Empty";
+  document.getElementById("youScore").textContent = state.youScore;
+  document.getElementById("lewyScore").textContent = state.lewyScore;
+}
+
+function draft(id, name) {
+  const team = state.turn % 2 === 0 ? "you" : "lewy";
+  state[team].push(id);
+  state.turn++;
+  save();
+  render();
+  alert((team === "you" ? "You" : "Lewy") + " drafted " + name);
+}
+
+function loadGames() {
+  const list = document.getElementById("gamesList");
+  list.innerHTML = "Loading...";
+  const API_KEY = "3c224515-8820-4ca2-a7ee-7aad7b41e85a";
+  const today = new Date().toISOString().split("T")[0];
+  fetch(`https://api.balldontlie.io/nba/v1/games?dates[]=${today}`, {
+    headers: { "Authorization": API_KEY }
+  })
+  .then(r => r.json())
+  .then(data => {
+    list.innerHTML = "";
+    if (!data.data || !data.data.length) {
+      list.innerHTML = "<p>No games today.</p>";
+      return;
+    }
+    data.data.forEach(g => {
+      const d = document.createElement("div");
+      d.style.padding = "10px 0";
+      d.style.borderBottom = "1px solid #eee";
+      d.innerHTML = `<strong>${g.visitor_team.abbreviation} @ ${g.home_team.abbreviation}</strong><br>
+        <span style="color:#666">${g.status} • ${g.home_team_score||0}-${g.visitor_team_score||0}</span>`;
+      list.appendChild(d);
+    });
+  })
+  .catch(() => list.innerHTML = "Could not load games");
+}
+  state.youScore = Math.floor(Math.random()*40)+90;
+  state.lewyScore = Math.floor(Math.random()*40)+90;
+  save();
+  render();
+}
+
+function show(id) {
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  event.target.classList.add("active");
+}
+
+function exportCode() {
+  const code = btoa(JSON.stringify(state));
+  navigator.clipboard.writeText(code).then(() => alert("Code copied")).catch(() => prompt("Copy this:", code));
+}
+
+function importCode() {
+  try {
+    state = JSON.parse(atob(document.getElementById("importBox").value.trim()));
+    save();
+    render();
+    alert("Imported");
+  } catch { alert("Bad code"); }
+}
+
+load();
+</script>
+</body>
+</html>
